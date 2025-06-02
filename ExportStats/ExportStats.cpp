@@ -1,4 +1,12 @@
+//pch.h for precompiled headers
 #include "pch.h"
+
+#include <windows.h>
+#include <wininet.h>
+#pragma comment(lib, "wininet.lib")
+
+
+
 #include <fstream>
 #include <string>
 #include <filesystem>
@@ -6,8 +14,13 @@
 #include <unordered_map>
 
 #include "ExportStats.h"
-#include "../ExportStats/nlohmann/json.hpp"
-using json = nlohmann::json;
+
+//Experimental JSON library
+
+//#include "../ExportStats/nlohmann/json.hpp"
+//using json = nlohmann::json;
+
+#include "nlohmann/json.hpp"
 
 //Demo tracking
 #include "bakkesmod/wrappers/GameObject/Stats/StatEventWrapper.h"
@@ -27,7 +40,7 @@ std::unordered_map<std::string, std::string> mapNameLookup = {
     { "Stadium_P", "DFH Stadium" },
     { "Stadium_Race_Day_p", "DFH Stadium (Circuit)" },
         //No warning for DFH Stadium Day
-    {"Stadium_day_p", "DFH Stadium (Day)"},
+    {"stadium_day_p", "DFH Stadium (Day)"},
 
     { "Stadium_Foggy_P", "DFH Stadium (Stormy)" },
     { "woods_p", "Drift Woods" },
@@ -131,7 +144,40 @@ void ExportStats::onLoad()
 
         LOG("Match ended. Duration: {} seconds", totalMatchDurationSeconds);
 
-        LogStats();  // <-- Ensure final duration is written to file
+
+        //Find JSON
+        std::filesystem::path path = GetJsonPath();
+
+        json j;
+
+        // Step 1: Read existing JSON file if it exists
+        std::ifstream inFile(path);
+        if (inFile.is_open()) {
+            try {
+                inFile >> j;
+            }
+            catch (...) {
+                LOG("Failed to parse JSON file. Starting with empty JSON.");
+                j = json{};
+            }
+            inFile.close();
+        }
+
+        // Step 2: Append the match duration
+        j["matchDuration"] = totalMatchDurationSeconds;
+
+        // Step 3: Write back to the file
+        std::ofstream outFile(path);
+        if (outFile.is_open()) {
+            outFile << j.dump(4); // pretty-print with 4 spaces
+            outFile.close();
+            LOG("Appended match duration to JSON file.");
+        }
+        else {
+            LOG("Failed to open JSON file for writing.");
+        }
+
+        FinalizeStats();
         });
 
 }
@@ -170,11 +216,11 @@ void ExportStats::ClearJson()
 }
 
 
-void ExportStats::LogStats()
+json ExportStats::LogStats()
 {
 
     ServerWrapper server = gameWrapper->GetCurrentGameState();
-    if (server.IsNull()) return;
+    if (server.IsNull()) return json{};
 
     std::string internalMapName = gameWrapper->GetCurrentMap();
     std::string mapName = mapNameLookup.contains(internalMapName)
@@ -191,12 +237,12 @@ void ExportStats::LogStats()
 
     if (cars.Count() == 0) {
         LOG("No cars found, skipping stat log.");
-        return;
+        return json{};
     }
 
     json j;
     j["map"] = mapName;
-    j["matchDuration"] = totalMatchDurationSeconds;
+    j["matchDuration"] = 0;
     j["players"] = json::array();
 
 
@@ -285,6 +331,8 @@ void ExportStats::LogStats()
         file << j.dump(4);
         file.close();
     }
+
+    return j;
 }
 
 void ExportStats::onStatTickerMessage(void* params) {
@@ -316,14 +364,58 @@ void ExportStats::onStatTickerMessage(void* params) {
     }
 }
 
+json ExportStats::ReadJson() {
+    std::filesystem::path path = GetJsonPath();
+    json readJSON;
+
+    std::ifstream inFile(path);
+    if (inFile.is_open()) {
+        try {
+            inFile >> readJSON;
+            LOG("Successfully read full JSON from file.");
+        }
+        catch (const std::exception& e) {
+            LOG("Failed to parse JSON: {}", e.what());
+        }
+        inFile.close();
+    }
+    else {
+        LOG("Failed to open JSON file for reading.");
+    }
+
+    return readJSON;
+}
+
 
 void ExportStats::FinalizeStats()
 {
     LOG("Finalizing match stats...");
 
-    LogStats();
-    LOG("Final match stats saved to: {}", GetJsonPath().string());
+    json readJSON = ReadJson();
+
+    if (readJSON.empty())
+    {
+        LOG("No final stats were recorded (LogStats returned empty JSON).");
+    }
+    else
+    {
+        LOG("Final stats JSON created successfully.");
+        LOG("Saving to file: {}", GetJsonPath().string());
+
+        std::ofstream file(GetJsonPath());
+        if (file.is_open())
+        {
+            file << readJSON.dump(4);
+            file.close();
+        }
+
+        LOG("Attempting to send final stats to API...");
+        SendJsonToAPI_WinINet(readJSON.dump());
+    }
+
+    LOG("FinalizeStats() complete.");
 }
+
 
 std::filesystem::path ExportStats::GetJsonPath()
 {
@@ -335,3 +427,54 @@ std::filesystem::path ExportStats::GetJsonPath()
     }
     return std::filesystem::path(home) / "Desktop" / "matchStats.json";
 }
+
+//LINK FOR API: https://ibeachzsite-production.up.railway.app/api/newgamedata
+
+bool ExportStats::SendJsonToAPI_WinINet(const std::string& jsonStr)
+{
+    HINTERNET hInternet = InternetOpenA("ExportStatsPlugin", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
+
+    HINTERNET hConnect = InternetConnectA(hInternet, "ibeachzsite-production.up.railway.app", INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Note: INTERNET_FLAG_SECURE enables HTTPS
+    HINTERNET hRequest = HttpOpenRequestA(hConnect, "POST", "/api/newgamedata", NULL, NULL, NULL,
+        INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE, 0);
+    if (!hRequest) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    std::string headers =
+        "Content-Type: application/json\r\n"
+        "x-api-secret: tE\\\\k2Ze?g%%fV:2£1N2G^J<7XL2\r\n";
+
+    // Add headers to request
+    if (!HttpAddRequestHeadersA(hRequest, headers.c_str(), -1L, HTTP_ADDREQ_FLAG_ADD | HTTP_ADDREQ_FLAG_REPLACE)) {
+        LOG("Failed to add headers.");
+    }
+
+    // Send the request
+    BOOL success = HttpSendRequestA(hRequest, NULL, 0, (LPVOID)jsonStr.c_str(), jsonStr.size());
+
+    // Cleanup
+    InternetCloseHandle(hRequest);
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+
+    if (!success) {
+        LOG("HttpSendRequestA failed. Error code: {}", GetLastError());
+    }
+
+    InternetCloseHandle(hRequest);
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+
+    return success == TRUE;
+}
+
