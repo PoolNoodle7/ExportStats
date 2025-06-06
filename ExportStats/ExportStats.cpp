@@ -27,6 +27,7 @@
 
 std::unordered_map<std::string, std::string> mapNameLookup = {
 
+<<<<<<< HEAD
     //Manually Added Maps
 { "Underwater_P", "Aquadome" },
 { "Underwater_GRS_P", "Aquadome (Salty Shallows" },
@@ -41,6 +42,22 @@ std::unordered_map<std::string, std::string> mapNameLookup = {
 { "Stadium_Race_Day_p", "DFH Stadium (Circuit)" },
 //No warning for DFH Stadium Day
 {"stadium_day_p", "DFH Stadium (Day)"},
+=======
+        //Manually Added Maps
+    { "Underwater_P", "Aquadome" },
+    { "Underwater_GRS_P", "Aquadome (Salty Shallows" },
+    { "Park_P", "Beckwith Park" },
+    { "Park_Night_P", "Beckwith Park (Night)" },
+    { "Park_Rainy_P", "Beckwith Park (Rainy)" },
+    { "cs_p", "Champions Field" },
+    { "cs_day_p", "Champions Field (Day)" },
+    { "outlaw_p", "Deadeye Canyon" },
+    { "Outlaw_Oasis_P", "Deadeye Canyon (Oasis)" },
+    { "Stadium_P", "DFH Stadium" },
+    { "Stadium_Race_Day_p", "DFH Stadium (Circuit)" },
+        //No warning for DFH Stadium Day
+    {"stadium_day_p", "DFH Stadium (Day)"},
+>>>>>>> d15c36071911330e880f1eea9af432b98a39f8d0
 
 { "Stadium_Foggy_P", "DFH Stadium (Stormy)" },
 { "woods_p", "Drift Woods" },
@@ -434,6 +451,7 @@ std::filesystem::path ExportStats::GetJsonPath()
 
 bool ExportStats::SendJsonToAPI_WinINet(const std::string& jsonStr)
 {
+<<<<<<< HEAD
     int apiErrorCode = 0; //Stoer API error codes, if any
 
 
@@ -444,6 +462,10 @@ bool ExportStats::SendJsonToAPI_WinINet(const std::string& jsonStr)
         apiErrorCode = GetLastError();
         return false;
     }
+=======
+    HINTERNET hInternet = InternetOpenA("ExportStatsPlugin", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
+>>>>>>> d15c36071911330e880f1eea9af432b98a39f8d0
 
     HINTERNET hConnect = InternetConnectA(hInternet, "ibeachzsite-production.up.railway.app", INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
     if (!hConnect) {
@@ -472,6 +494,7 @@ bool ExportStats::SendJsonToAPI_WinINet(const std::string& jsonStr)
     // Send the request
     BOOL success = HttpSendRequestA(hRequest, NULL, 0, (LPVOID)jsonStr.c_str(), jsonStr.size());
 
+<<<<<<< HEAD
     //Check if request was successful
     if (!success) {
         LOG("HttpSendRequestA failed. Error code: {}", GetLastError());
@@ -506,10 +529,14 @@ bool ExportStats::SendJsonToAPI_WinINet(const std::string& jsonStr)
     }
 
     //Clean up
+=======
+    // Cleanup
+>>>>>>> d15c36071911330e880f1eea9af432b98a39f8d0
     InternetCloseHandle(hRequest);
     InternetCloseHandle(hConnect);
     InternetCloseHandle(hInternet);
 
+<<<<<<< HEAD
     // Check for specific error code 502 and retry ONCE
     if (apiErrorCode == 502 && !hasRetriedSend) {
 
@@ -524,6 +551,15 @@ bool ExportStats::SendJsonToAPI_WinINet(const std::string& jsonStr)
     }
 
 
+=======
+    if (!success) {
+        LOG("HttpSendRequestA failed. Error code: {}", GetLastError());
+    }
+
+    InternetCloseHandle(hRequest);
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+>>>>>>> d15c36071911330e880f1eea9af432b98a39f8d0
 
     return success == TRUE;
 }

@@ -54,11 +54,14 @@ private:
 
 	bool SendJsonToAPI_WinINet(const std::string& jsonStr);
 
+<<<<<<< HEAD
 	//BOOLEAN for retrying send
 	bool hasRetriedSend = false;
 
 
 
+=======
+>>>>>>> d15c36071911330e880f1eea9af432b98a39f8d0
 	std::unordered_map<std::string, int> boostUsed;
 	std::unordered_map<std::string, int> previousBoost;
 
