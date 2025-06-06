@@ -10,11 +10,17 @@
 #include <unordered_map>
 #include <string>
 
+#include "../ExportStats/nlohmann/json.hpp"
+using json = nlohmann::json;
+
+json finalMatchJson;
+
+
 #include "version.h"
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
 
 
-class ExportStats: public BakkesMod::Plugin::BakkesModPlugin
+class ExportStats : public BakkesMod::Plugin::BakkesModPlugin
 	//,public SettingsWindowBase // Uncomment if you wanna render your own tab in the settings menu
 	//,public PluginWindowBase // Uncomment if you want to render your own plugin window
 {
@@ -39,17 +45,25 @@ private:
 
 	void ClearJson();
 	void ScheduleStatsLogging();
-	void LogStats();
+	json LogStats();
+	json ReadJson();
 	void FinalizeStats();
 
 	// Helper
 	std::filesystem::path GetJsonPath();
 
+	bool SendJsonToAPI_WinINet(const std::string& jsonStr);
+
+	//BOOLEAN for retrying send
+	bool hasRetriedSend = false;
+
+
+
 	std::unordered_map<std::string, int> boostUsed;
 	std::unordered_map<std::string, int> previousBoost;
 
 
-	
+
 	std::unordered_map<std::string, std::string> playerIdToName;
 
 	std::unordered_map<std::string, int> demosInflicted;
